@@ -50,12 +50,12 @@ export default function Contatos() {
   };
 
   return (
-    <div className="flex items-start justify-between h-screen p-12">
+    <div className="flex items-start justify-between h-screen ">
       <Navbar />
-      <div className="flex w-[75%] flex-col gap-4 items-center justify-center">
+      <div className="flex w-[85%] flex-col gap-4 items-center justify-center p-12">
         <div className="flex items-start justify-start w-full gap-6">
           <h1 className="text-3xl">Contatos</h1>
-          <Button>Adicionar +</Button>
+          {/* <Button>Adicionar +</Button> */}
         </div>
         <Table className="border">
           <TableHeader>
@@ -64,7 +64,8 @@ export default function Contatos() {
               <TableHead>Empresa</TableHead>
               <TableHead>Segmento da empresa</TableHead>
               <TableHead>Cargo</TableHead>
-              <TableHead>Ação</TableHead>
+              <TableHead>Primeiro contato</TableHead>
+              <TableHead>Último contato</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -74,10 +75,8 @@ export default function Contatos() {
                 <TableCell>{el.empresa}</TableCell>
                 <TableCell>{el.empresa_segmento}</TableCell>
                 <TableCell>{el.cargo}</TableCell>
-                <TableCell className="gap-4 flex">
-                  <Button>Editar</Button>
-                  <Button>Excluir</Button>
-                </TableCell>
+                <TableCell>{el.primeiro_contato ? el.primeiro_contato : '-'}</TableCell>
+                <TableCell>{el.ultimo_contato ? el.ultimo_contato : '-'}</TableCell>
               </TableRow>
             ))}
           </TableBody>

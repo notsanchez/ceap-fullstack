@@ -1,6 +1,6 @@
 const express = require("express");
 const cron = require("node-cron");
-const { faker } = require('@faker-js/faker/locale/pt_BR');
+const { faker } = require("@faker-js/faker/locale/pt_BR");
 const { Client } = require("pg");
 const { default: axios } = require("axios");
 const cors = require("cors");
@@ -16,90 +16,128 @@ const client = new Client({
 client.connect();
 
 const segmentosEmpresas = [
-    'Tecnologia',
-    'Saúde',
-    'Educação',
-    'Varejo',
-    'Financeiro',
-    'Indústria',
+  "Tecnologia",
+  "Saúde",
+  "Educação",
+  "Varejo",
+  "Financeiro",
+  "Indústria",
 ];
 
-const IAURL = "http://localhost:11434/api/generate"
+const IAURL = "https://api.openai.com/v1/chat/completions";
+const API_KEY =
+  "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";
 
-async function addFakeContact() {
-  const name = faker.person.firstName();
-  const company = faker.company.name();
-  const jobPosition = faker.person.jobTitle();
-  const email = faker.internet.email();
-  const empresaSegmento = segmentosEmpresas[Math.floor(Math.random() * segmentosEmpresas.length)];
-
-  const query = `INSERT INTO contatos (nome, empresa, empresa_segmento, cargo, email) VALUES ($1, $2, $3, $4, $5)`;
-  const values = [name, company, empresaSegmento, jobPosition, email];
-
+async function checkForNewContactsAndAddMessage() {
   try {
-    await client.query(query, values);
-    console.log(`Contato ${name} adicionado com sucesso!`);
+    const activeResult = await client.query(
+      `SELECT active FROM contatos_automatico ORDER BY id DESC LIMIT 1`
+    );
+
+    if (activeResult.rows[0].active === false) {
+      return;
+    }
+
+    const name = faker.person.firstName();
+    const company = faker.company.name();
+    const jobPosition = faker.person.jobTitle();
+    const email = faker.internet.email();
+    const empresaSegmento =
+      segmentosEmpresas[Math.floor(Math.random() * segmentosEmpresas.length)];
+
+    const query = `INSERT INTO contatos (nome, empresa, empresa_segmento, cargo, email) 
+                    VALUES ($1, $2, $3, $4, $5) 
+                    RETURNING id`;
+    const values = [name, company, empresaSegmento, jobPosition, email];
+
+    try {
+      const result = await client.query(query, values);
+      addedContact = result.rows[0];
+      console.log(`Contato ${name} adicionado com sucesso!`);
+    } catch (err) {
+      console.error("Erro ao adicionar contato:", err);
+    }
+
+    const { id } = addedContact;
+
+    let subjectResponse;
+    let messageResponse;
+
+    await axios
+      .post(
+        IAURL,
+        {
+          messages: [
+            {
+              role: "system",
+              content: `
+                    gere um script para primeiro contato de prospecção, você deve se apresentar como a organização "CEAP" em terceira pessoa no masculino por exemplo "O CEAP", o nome do cliente é "${name}", o cargo do 
+                    cliente em questão é "${jobPosition}" e a empresa que trabalha é do seguimento "${empresaSegmento}", o nome da empresa é 
+                    "${company}" O projeto que busca esta prospecção é uma ONG que auxilia jovens da periferia de São Paulo em suas carreiras profissionais, 
+                    com cursos de redes de computadores, informatica, e adminsitração, sua missão é trazer jovens preparados para o mercado de trabalho, 
+                    mas para isso toda essa infraestrutura tem um custo e eles precisam de doadores para continuar com essa missão. o nome do projeto é CEAP. 
+                    Gere apenas a mensagem do email, sem espaçamentos desnecessarios e sem o assunto, não deve incluir no email "[Seu Nome]"`,
+            },
+          ],
+          model: "gpt-4o-mini",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${API_KEY}`,
+          },
+        }
+      )
+      .then((res) => {
+        messageResponse = res.data.choices[0].message.content;
+      });
+
+    await axios
+      .post(
+        IAURL,
+        {
+          messages: [
+            {
+              role: "system",
+              content: `
+                    gere um titulo simples de no maximo 1 linha para o seguinte email: "${messageResponse}". 
+                    Gere apenas a mensagem do assunto/titulo, sem espaçamentos desnecessarios`,
+            },
+          ],
+          model: "gpt-4o-mini",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${API_KEY}`,
+          },
+        }
+      )
+      .then((res) => {
+        console.log(res.data.choices[0].message.content);
+        subjectResponse = res.data.choices[0].message.content;
+      });
+
+    const assunto = subjectResponse;
+    const mensagem = messageResponse;
+
+    await client.query(
+      `INSERT INTO mensagens (id_contato, assunto, mensagem) VALUES ($1, $2, $3)`,
+      [id, assunto, mensagem]
+    );
+
+    console.log(`Mensagem adicionada para o contato: ${name}`);
   } catch (err) {
-    console.error("Erro ao adicionar contato:", err);
+    console.error("Erro ao verificar contatos e adicionar mensagens:", err);
   }
 }
 
-async function checkForNewContactsAndAddMessage() {
-    try {
-      const result = await client.query(`
-        SELECT c.id, c.nome, c.empresa, c.empresa_segmento, c.cargo
-        FROM contatos c
-        LEFT JOIN mensagens m ON c.id = m.id_contato
-        WHERE m.id_contato IS NULL
-      `);
-  
-      for (let row of result.rows) {
-        const { id, nome, empresa, empresa_segmento, cargo } = row;
-
-        // let messageResponse;
-
-        // await axios.post(IAURL, 
-        //     {
-        //         "model": "llama3",
-        //         "prompt": `
-        //             gere um script para primeiro contato de prospecção, o nome do cliente é ${nome}, o cargo do 
-        //             cliente em questão é ${cargo} e a empresa que trabalha é do seguimento ${empresa_segmento}, o nome da empresa é 
-        //             ${empresa} O projeto que busca esta prospecção é uma ONG que auxilia jovens da periferia de São Paulo em suas carreiras profissionais, 
-        //             com cursos de redes de computadores, informatica, e adminsitração, sua missão é trazer jovens preparados para o mercado de trabalho, 
-        //             mas para isso toda essa infraestrutura tem um custo e eles precisam de doadores para continuar com essa missão. o nome do projeto é CEAP. 
-        //             Gere apenas a mensagem do email, sem espaçamentos desnecessarios e sem o assunto`,
-        //         "stream": false
-        //     }
-        // ).then((res) => {
-        //     messageResponse = res.data.response
-        // })
-
-        const assunto = `Bem-vindo(a), ${nome}`;
-        const mensagem = `Olá ${nome}, agradecemos pelo seu interesse!`;
-  
-        await client.query(
-          `INSERT INTO mensagens (id_contato, assunto, mensagem) VALUES ($1, $2, $3)`,
-          [id, assunto, mensagem]
-        );
-  
-        console.log(`Mensagem adicionada para o contato: ${nome}`);
-      }
-    } catch (err) {
-      console.error('Erro ao verificar contatos e adicionar mensagens:', err);
-    }
-  }
-
-// cron.schedule("*/25 * * * * *", () => {
-//   addFakeContact();
-// });
-
-cron.schedule('*/15 * * * * *', () => {
-    checkForNewContactsAndAddMessage();
-});  
+cron.schedule("*/8 * * * * *", () => {
+  checkForNewContactsAndAddMessage();
+});
 
 const app = express();
 
 app.use(cors());
+app.use(express.urlencoded({ extended: true }));
 
 app.get("/contatos", async (req, res) => {
   const { page = 1, limit = 10 } = req.query;
@@ -107,7 +145,7 @@ app.get("/contatos", async (req, res) => {
   try {
     const offset = (page - 1) * limit;
     const result = await client.query(
-      "SELECT * FROM contatos ORDER BY id LIMIT $1 OFFSET $2",
+      "SELECT * FROM contatos ORDER BY id DESC LIMIT $1 OFFSET $2",
       [limit, offset]
     );
 
@@ -132,7 +170,7 @@ app.get("/mensagens", async (req, res) => {
   try {
     const offset = (page - 1) * limit;
     const result = await client.query(
-      "SELECT m.assunto, m.mensagem, c.nome FROM mensagens m INNER JOIN contatos c ON c.id = m.id_contato ORDER BY m.id LIMIT $1 OFFSET $2",
+      "SELECT m.id, m.assunto, m.mensagem, c.nome, c.email FROM mensagens m INNER JOIN contatos c ON c.id = m.id_contato ORDER BY m.id DESC LIMIT $1 OFFSET $2",
       [limit, offset]
     );
 
@@ -151,6 +189,168 @@ app.get("/mensagens", async (req, res) => {
   }
 });
 
+app.post("/active-automatic-contacts", async (req, res) => {
+  try {
+    const lastResult = await client.query(
+      "SELECT active FROM contatos_automatico ORDER BY id DESC LIMIT 1"
+    );
+
+    let newActiveValue;
+
+    if (lastResult.rows.length > 0) {
+      const lastActive = lastResult.rows[0].active;
+
+      newActiveValue = lastActive ? false : true;
+    } else {
+      newActiveValue = true;
+    }
+
+    await client.query("INSERT INTO contatos_automatico (active) values ($1)", [
+      newActiveValue,
+    ]);
+
+    res.json({ success: true, newActiveValue });
+  } catch (err) {
+    console.error("Erro ao processar a requisição:", err);
+    res.status(500).json({ error: "Erro ao processar a requisição." });
+  }
+});
+
+app.get("/automatic-contacts", async (req, res) => {
+  try {
+    const lastResult = await client.query(
+      "SELECT active FROM contatos_automatico ORDER BY id DESC LIMIT 1"
+    );
+
+    const lastActive = lastResult.rows[0].active;
+
+    res.json({ success: true, active: lastActive });
+  } catch (err) {
+    console.error("Erro ao processar a requisição:", err);
+    res.status(500).json({ error: "Erro ao processar a requisição." });
+  }
+});
+
+app.post("/regen-message", async (req, res) => {
+  try {
+    if (!req.query.id) {
+      return res
+        .status(400)
+        .json({ error: "Corpo da requisição não enviado." });
+    }
+
+    const { id } = req.query;
+
+    const lastResult = await client.query(
+      "SELECT * FROM mensagens WHERE id = $1",
+      [id]
+    );
+
+    if (lastResult.rows.length === 0) {
+      return res.status(404).json({ error: "Mensagem não encontrada." });
+    }
+
+    const { id_contato } = lastResult.rows[0];
+
+    const contactResult = await client.query(
+      "SELECT * FROM contatos WHERE id = $1",
+      [id_contato]
+    );
+
+    if (contactResult.rows.length === 0) {
+      return res.status(404).json({ error: "Contato não encontrado." });
+    }
+
+    const { nome, empresa, cargo, empresa_segmento } = contactResult.rows[0];
+
+    let subjectResponse;
+    let messageResponse;
+
+    await axios
+      .post(
+        IAURL,
+        {
+          messages: [
+            {
+              role: "system",
+              content: `gere um script para primeiro contato de prospecção, você deve se apresentar como a organização "CEAP" em terceira pessoa no masculino por exemplo "O CEAP", o nome do cliente é "${nome}", o cargo do 
+                        cliente em questão é "${cargo}" e a empresa que trabalha é do seguimento "${empresa_segmento}", o nome da empresa é 
+                        "${empresa}". O projeto que busca esta prospecção é uma ONG que auxilia jovens da periferia de São Paulo em suas carreiras profissionais, 
+                        com cursos de redes de computadores, informatica, e administração, sua missão é trazer jovens preparados para o mercado de trabalho, 
+                        mas para isso toda essa infraestrutura tem um custo e eles precisam de doadores para continuar com essa missão. o nome do projeto é CEAP. 
+                        Gere apenas a mensagem do email, sem espaçamentos desnecessarios e sem o assunto, não deve incluir no email "[Seu Nome]".`,
+            },
+          ],
+          model: "gpt-4o-mini",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${API_KEY}`,
+          },
+        }
+      )
+      .then((res) => {
+        messageResponse = res.data.choices[0].message.content;
+      });
+
+    await axios
+      .post(
+        IAURL,
+        {
+          messages: [
+            {
+              role: "system",
+              content: `gere um titulo simples de no maximo 1 linha para o seguinte email: "${messageResponse}". 
+                        Gere apenas a mensagem do assunto/titulo, sem espaçamentos desnecessarios.`,
+            },
+          ],
+          model: "gpt-4o-mini",
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${API_KEY}`,
+          },
+        }
+      )
+      .then((res) => {
+        subjectResponse = res.data.choices[0].message.content;
+      });
+
+    await client.query(
+      `UPDATE mensagens SET assunto = $1, mensagem = $2 WHERE id = $3`,
+      [subjectResponse, messageResponse, id]
+    );
+
+    res.json({ success: true, message: "Mensagem atualizada com sucesso." });
+  } catch (err) {
+    console.error("Erro ao processar a requisição:", err);
+    res.status(500).json({ error: "Erro ao processar a requisição." });
+  }
+});
+
+app.get("/message", async (req, res) => {
+  try {
+    const { id } = req.query;
+
+    const lastResult = await client.query(
+      "SELECT * FROM mensagens WHERE id = $1",
+      [id]
+    );
+
+    if (lastResult.rows.length === 0) {
+      return res.status(404).json({ error: "Mensagem não encontrada." });
+    }
+
+    res.json({
+      success: true,
+      assunto: lastResult.rows[0].assunto,
+      mensagem: lastResult.rows[0].mensagem,
+    });
+  } catch (err) {
+    console.error("Erro ao processar a requisição:", err);
+    res.status(500).json({ error: "Erro ao processar a requisição." });
+  }
+});
 
 const PORT = process.env.PORT || 8585;
 app.listen(PORT, () => {

@@ -1,6 +1,13 @@
-'use client'
+"use client";
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -10,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import axios from "axios";
+import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function Inbox() {
@@ -17,15 +25,17 @@ export default function Inbox() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const [selectedMessage, setSelectedMessage]: any = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const limit = 10;
+  const limit = 15;
 
   useEffect(() => {
     const intervalId = setInterval(() => {
       fetchContacts(page);
-    }, 1200);
+    }, 1000);
 
-    return () => clearInterval(intervalId); 
+    return () => clearInterval(intervalId);
   }, [page]);
 
   const fetchContacts = async (page: number) => {
@@ -53,12 +63,29 @@ export default function Inbox() {
     }
   };
 
+  const handleRowClick = (message: any) => {
+    setSelectedMessage(message);
+  };
+
+  const handleRegen = async (id: string) => {
+    setIsLoading(true);
+    await axios.post(`http://localhost:8585/regen-message?id=${id}`);
+    await axios.get(`http://localhost:8585/message?id=${id}`).then((res) => {
+      setSelectedMessage((prevState: any) => ({
+        ...prevState,
+        mensagem: res.data.mensagem,
+        assunto: res.data.assunto,
+      }));
+      setIsLoading(false);
+    });
+  };
+
   return (
-    <div className="flex items-start justify-between h-screen p-12">
+    <div className="flex items-start justify-between h-screen">
       <Navbar />
-      <div className="flex w-[75%] flex-col gap-4 items-center justify-center">
+      <div className="flex w-[85%] flex-col gap-4 items-center justify-center p-12">
         <div className="flex items-start justify-start w-full gap-6">
-          <h1 className="text-3xl">Contatos</h1>
+          <h1 className="text-3xl">Mensagens</h1>
         </div>
         <Table className="border">
           <TableHeader>
@@ -67,21 +94,79 @@ export default function Inbox() {
               <TableHead>Assunto</TableHead>
               <TableHead>Mensagem</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Ação</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {messages?.map((el: any) => (
-              <TableRow key={el.id}>
-                <TableCell>{el.nome}</TableCell>
-                <TableCell>{el.assunto}</TableCell>
-                <TableCell>{el.mensagem}</TableCell>
-                <TableCell>Aguardando aprovação</TableCell>
-                <TableCell className="gap-4 flex">
-                  <Button>Aprovar</Button>
-                  <Button>Gerar novamente</Button>
-                </TableCell>
-              </TableRow>
+              <Dialog key={el.id}>
+                <DialogTrigger asChild>
+                  <TableRow
+                    className="cursor-pointer"
+                    onClick={() => handleRowClick(el)}
+                  >
+                    <TableCell>{el.nome}</TableCell>
+                    <TableCell>{el.assunto}</TableCell>
+                    <TableCell>{el.mensagem.substring(0, 40)}...</TableCell>
+                    <TableCell>Aguardando aprovação</TableCell>
+                  </TableRow>
+                </DialogTrigger>
+                {selectedMessage && selectedMessage.id === el.id && (
+                  <DialogContent className="w-full flex flex-col gap-4">
+                    {/* <DialogHeader>
+                      <DialogTitle>Mensagem gerada</DialogTitle>
+                    </DialogHeader> */}
+                    {isLoading ? (
+                      <div className="w-full flex flex-col items-center justify-center p-12">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Gerando novamente...
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-col gap-4 py-4 h-full">
+                          <div className="items-center gap-4">
+                            <Label className="text-lg">Contato</Label>
+                            <p className="text-sm mt-1 whitespace-pre-wrap">
+                              {selectedMessage.nome}
+                            </p>
+                            <p className="text-sm mt-1 whitespace-pre-wrap">
+                              {selectedMessage.email}
+                            </p>
+                          </div>
+                          <div className="items-center gap-4">
+                            <Label className="text-lg">Assunto do email</Label>
+                            <p className="text-sm mt-1 whitespace-pre-wrap">
+                              {selectedMessage.assunto}
+                            </p>
+                          </div>
+                          <div className="w-full h-[1px] bg-zinc-400"></div>
+                          <div className="items-center gap-4 h-full">
+                            <Label className="text-lg">Mensagem gerada</Label>
+                            <p className="text-sm mt-1 whitespace-pre-wrap">
+                              {selectedMessage.mensagem}
+                            </p>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button disabled type="button">
+                            Confirmar
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              handleRegen(selectedMessage.id);
+                            }}
+                            type="button"
+                          >
+                            Gerar novamente
+                          </Button>
+                          <Button type="button" variant={"outline"}>
+                            Excluir
+                          </Button>
+                        </DialogFooter>
+                      </>
+                    )}
+                  </DialogContent>
+                )}
+              </Dialog>
             ))}
           </TableBody>
         </Table>
