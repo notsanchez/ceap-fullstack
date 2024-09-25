@@ -25,8 +25,7 @@ const segmentosEmpresas = [
 ];
 
 const IAURL = "https://api.openai.com/v1/chat/completions";
-const API_KEY =
-  "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";
+const API_KEY = process.env.API_KEY;
 
 async function checkForNewContactsAndAddMessage() {
   try {
