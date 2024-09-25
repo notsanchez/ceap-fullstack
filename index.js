@@ -5,6 +5,8 @@ const { Client } = require("pg");
 const { default: axios } = require("axios");
 const cors = require("cors");
 
+require('dotenv').config();
+
 const client = new Client({
   user: "postgres",
   host: "autorack.proxy.rlwy.net",
