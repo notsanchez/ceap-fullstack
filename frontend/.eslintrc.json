@@ -1,7 +1,8 @@
 {
   "extends": ["next/core-web-vitals", "next/typescript"],
   "rules": {
-    "@typescript-eslint/no-unused-vars": "off", 
-    "@typescript-eslint/no-empty-interface": "off" 
+    "@typescript-eslint/no-unused-vars": "off", // Desativa a regra de variáveis não utilizadas
+    "@typescript-eslint/no-empty-interface": "off", // Desativa a regra para interfaces vazias
+    "@typescript-eslint/no-explicit-any": "off" // Desativa a regra de uso do tipo 'any'
   }
 }
