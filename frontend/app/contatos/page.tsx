@@ -27,7 +27,7 @@ export default function Contatos() {
   const fetchContacts = async (page: number) => {
     try {
       const res = await axios.get(
-        `http://localhost:8585/contatos?page=${page}&limit=${limit}`
+        `https://ceap-fullstack.onrender.com/contatos?page=${page}&limit=${limit}`
       );
       setContatos(res.data.data);
       setTotalPages(res.data.totalPages);

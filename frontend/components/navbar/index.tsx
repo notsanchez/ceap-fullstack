@@ -14,12 +14,12 @@ const Navbar = () => {
   const [active, setActive] = useState(false);
 
   const handleChangeContactAutomatic = async () => {
-    const response = await axios.post('http://localhost:8585/active-automatic-contacts');
+    const response = await axios.post('https://ceap-fullstack.onrender.com/active-automatic-contacts');
     setActive(response.data.newActiveValue);
   };
 
   useEffect(() => {
-    axios.get('http://localhost:8585/automatic-contacts').then((res) => {
+    axios.get('https://ceap-fullstack.onrender.com/automatic-contacts').then((res) => {
       setActive(res.data.active);
     });
   }, []);

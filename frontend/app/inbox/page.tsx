@@ -2,19 +2,19 @@
 import Navbar from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
 } from "@/components/ui/table";
 import axios from "axios";
 import { Loader2 } from "lucide-react";
@@ -41,7 +41,7 @@ export default function Inbox() {
   const fetchContacts = async (page: number) => {
     try {
       const res = await axios.get(
-        `http://localhost:8585/mensagens?page=${page}&limit=${limit}`
+        `https://ceap-fullstack.onrender.com/mensagens?page=${page}&limit=${limit}`
       );
       setMessages(res.data.data);
       setTotalPages(res.data.totalPages);
@@ -69,8 +69,8 @@ export default function Inbox() {
 
   const handleRegen = async (id: string) => {
     setIsLoading(true);
-    await axios.post(`http://localhost:8585/regen-message?id=${id}`);
-    await axios.get(`http://localhost:8585/message?id=${id}`).then((res) => {
+    await axios.post(`https://ceap-fullstack.onrender.com/regen-message?id=${id}`);
+    await axios.get(`https://ceap-fullstack.onrender.com/message?id=${id}`).then((res) => {
       setSelectedMessage((prevState: any) => ({
         ...prevState,
         mensagem: res.data.mensagem,
