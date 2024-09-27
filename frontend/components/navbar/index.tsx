@@ -27,6 +27,13 @@ const Navbar = () => {
   return (
     <div className="flex w-[14%] flex-col gap-4 items-center justify-start border-r-2 h-screen py-8 px-2">
       <Button
+        variant={pathname === "/" ? "default" : "outline"}
+        onClick={() => router?.push("/")}
+        className="w-full"
+      >
+        Home
+      </Button>
+      <Button
         variant={pathname === "/contatos" ? "default" : "outline"}
         onClick={() => router?.push("/contatos")}
         className="w-full"
